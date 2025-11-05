@@ -277,7 +277,7 @@ main() {
     # 设置网络模式
     NETWORK_MODE="lan"  # 或 "wan"
 
-    sudo "$NETWORK_SCRIPT" 5
+    "$NETWORK_SCRIPT" 5
     
     # echo "📡 配置网络为 $NETWORK_MODE 模式..."
     # if ! configure_network_auto "$NETWORK_MODE"; then
