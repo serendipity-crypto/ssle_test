@@ -224,7 +224,7 @@ run_benchmark() {
     fi
     
     # 运行程序
-    ./"$LOCAL_PROGRAM" "$party_id" "$config_file" "$network_mode"
+    ./$LOCAL_PROGRAM $party_id $config_file $network_mode
 }
 
 # 主函数
