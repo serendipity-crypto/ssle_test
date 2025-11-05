@@ -227,6 +227,28 @@ run_benchmark() {
     "./$LOCAL_PROGRAM" "$party_id" "$config_file" "$network_mode"
 }
 
+upload_files() {
+    local file_pattern="benchmark_results_p*.csv"
+    local success_count=0
+    local fail_count=0
+    
+    # 查找匹配的文件
+    local files=$(find . -maxdepth 1 -name "$file_pattern" -type f | sort)
+    
+    for file in $files; do
+        [ -z "$file" ] && continue
+        
+        # 执行上传
+        if aws s3 cp "$file" "s3://dont-delete-ssle/ssle/" --no-progress; then
+            success_count=$((success_count + 1))
+        else
+            fail_count=$((fail_count + 1))
+        fi
+    done
+    
+    return $fail_count
+}
+
 # 主函数
 main() {
     print_info "开始自动部署EMP Share Benchmark"
@@ -285,28 +307,6 @@ main() {
     upload_files
     
     print_success "自动部署和运行完成"
-}
-
-upload_files() {
-    local file_pattern="benchmark_results_p*.csv"
-    local success_count=0
-    local fail_count=0
-    
-    # 查找匹配的文件
-    local files=$(find . -maxdepth 1 -name "$file_pattern" -type f | sort)
-    
-    for file in $files; do
-        [ -z "$file" ] && continue
-        
-        # 执行上传
-        if aws s3 cp "$file" "s3://dont-delete-ssle/ssle/" --no-progress; then
-            success_count=$((success_count + 1))
-        else
-            fail_count=$((fail_count + 1))
-        fi
-    done
-    
-    return $fail_count
 }
 
 main
