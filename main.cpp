@@ -322,7 +322,7 @@ bool read_config(const std::string &filename, int &num_parties,
 
 int main(int argc, char **argv)
 {
-    if (argc != 4)
+    if (argc != 3)
     {
         std::cout << "Usage: ./benchmark_two_rounds <party_id> <config_file> [network_mode]" << std::endl;
         std::cout << "Example: ./benchmark_two_rounds 0 config.txt lan" << std::endl;
