@@ -270,18 +270,20 @@ main() {
     # download_file "$CONFIG_URL" "$LOCAL_CONFIG" || exit 1
 
     # 检查网络配置脚本
-    if ! check_network_script; then
-        exit 1
-    fi
+    # if ! check_network_script; then
+    #     exit 1
+    # fi
 
     # 设置网络模式
     NETWORK_MODE="lan"  # 或 "wan"
+
+    sudo "$NETWORK_SCRIPT" 5
     
-    echo "📡 配置网络为 $NETWORK_MODE 模式..."
-    if ! configure_network_auto "$NETWORK_MODE"; then
-        echo "❌ 网络配置失败"
-        exit 1
-    fi
+    # echo "📡 配置网络为 $NETWORK_MODE 模式..."
+    # if ! configure_network_auto "$NETWORK_MODE"; then
+    #     echo "❌ 网络配置失败"
+    #     exit 1
+    # fi
 
     # 验证配置文件
     print_info "验证配置文件..."
