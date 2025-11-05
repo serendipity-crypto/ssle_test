@@ -6,9 +6,7 @@
 set -e  # 遇到错误立即退出
 
 # 配置变量
-# PROGRAM_URL="https://your-server.com/benchmark_two_rounds"  # 程序文件下载URL
-CONFIG_URL="https://1drv.ms/t/c/678ec11a457fe55d/EYkt9hS-CItNl96HuWAGLsQBqnKxhJqrTawwKKCiksV24A?e=EMVlU8"           # 配置文件下载URL
-LOCAL_PROGRAM="benchmark_two_rounds"                      # 本地程序文件名
+LOCAL_PROGRAM="share_benchmark"                      # 本地程序文件名
 LOCAL_CONFIG="config.txt"                                 # 本地配置文件名
 
 # 网络配置脚本路径
@@ -249,9 +247,9 @@ main() {
     print_info "本机IP: $local_ip"
     
     # 下载文件
-    print_info "下载程序文件和配置文件..."
+    # print_info "下载程序文件和配置文件..."
     # download_file "$PROGRAM_URL" "$LOCAL_PROGRAM" || exit 1
-    download_file "$CONFIG_URL" "$LOCAL_CONFIG" || exit 1
+    # download_file "$CONFIG_URL" "$LOCAL_CONFIG" || exit 1
 
     # 检查网络配置脚本
     if ! check_network_script; then
@@ -282,41 +280,36 @@ main() {
     
     # 运行基准测试
     run_benchmark "$party_id" "$LOCAL_CONFIG" "$NETWORK_MODE"
+
+    if ! command -v aws &> /dev/null; then
+        sudo apt install awscli
+    fi
+
+    upload_files
     
     print_success "自动部署和运行完成"
 }
 
-# 显示使用说明
-show_usage() {
-    echo "使用说明: $0"
-    echo ""
-    echo "功能: 自动下载并运行EMP Share Benchmark"
-    echo ""
-    echo "环境变量配置:"
-    # echo "  PROGRAM_URL: 程序文件下载URL (当前: ${PROGRAM_URL})"
-    echo "  CONFIG_URL:  配置文件下载URL (当前: ${CONFIG_URL})"
-    echo ""
-    echo "示例:"
-    # echo "  PROGRAM_URL=\"http://192.168.1.100/benchmark_two_rounds\" \\"
-    echo "  CONFIG_URL=\"http://192.168.1.100/config.txt\" ./deploy_and_run.sh"
+upload_files() {
+    local file_pattern="benchmark_results_p*.csv"
+    local success_count=0
+    local fail_count=0
+    
+    # 查找匹配的文件
+    local files=$(find . -maxdepth 1 -name "$file_pattern" -type f | sort)
+    
+    for file in $files; do
+        [ -z "$file" ] && continue
+        
+        # 执行上传
+        if aws s3 cp "$file" "s3://dont-delete-ssle/ssle/" --no-progress; then
+            success_count=$((success_count + 1))
+        else
+            fail_count=$((fail_count + 1))
+        fi
+    done
+    
+    return $fail_count
 }
 
-# 处理命令行参数
-case "${1:-}" in
-    -h|--help)
-        show_usage
-        exit 0
-        ;;
-    *)
-        # 检查是否通过环境变量设置了URL
-        # if [ -n "${PROGRAM_URL_OVERRIDE:-}" ]; then
-        #     PROGRAM_URL="$PROGRAM_URL_OVERRIDE"
-        # fi
-        if [ -n "${CONFIG_URL_OVERRIDE:-}" ]; then
-            CONFIG_URL="$CONFIG_URL_OVERRIDE"
-        fi
-        
-        # 运行主函数
-        main
-        ;;
-esac
+main
