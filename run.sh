@@ -224,8 +224,8 @@ run_benchmark() {
     fi
 
     # 运行程序
-    echo "执行命令: ./\"$LOCAL_PROGRAM\" \"$party_id\" \"$config_file\" \"$network_mode\""
-    "./$LOCAL_PROGRAM" "$party_id" "$config_file" "$network_mode"
+    # echo "执行命令: ./\"$LOCAL_PROGRAM\" \"$party_id\" \"$config_file\" \"$network_mode\""
+    ./"$LOCAL_PROGRAM" "$party_id" "$config_file" "$network_mode"
 }
 
 upload_files() {
