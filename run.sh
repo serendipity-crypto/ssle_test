@@ -224,12 +224,7 @@ run_benchmark() {
     fi
     
     # 运行程序
-    if ./"$LOCAL_PROGRAM" "$party_id" "$config_file" "$network_mode"; then
-        print_success "基准测试完成"
-    else
-        print_error "基准测试运行失败"
-        return 1
-    fi
+    ./"$LOCAL_PROGRAM" "$party_id" "$config_file" "$network_mode"
 }
 
 # 主函数
