@@ -223,9 +223,21 @@ run_benchmark() {
         return 1
     fi
 
+    party_id_clean=$(echo "$party_id" | tr -d '[:space:]' | tr -d '\000-\037')
+
+    if ! [[ "$party_id_clean" =~ ^[0-9]+$ ]]; then
+        echo "错误：party_id 必须为纯数字，当前值为: '$party_id'"
+        exit 1
+    fi
+
+    if [ -z "$party_id" ]; then
+        echo "错误:party_id 为空"
+        exit 1
+    fi
+
     # 运行程序
     # echo "执行命令: ./\"$LOCAL_PROGRAM\" \"$party_id\" \"$config_file\" \"$network_mode\""
-    "$LOCAL_PROGRAM" "$party_id" "$config_file" "$network_mode"
+    "$LOCAL_PROGRAM" "$party_id_clean" "$config_file" "$network_mode"
 }
 
 upload_files() {
