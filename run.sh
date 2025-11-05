@@ -264,8 +264,6 @@ upload_files() {
 
 # 主函数
 main() {
-    print_info "开始自动部署EMP Share Benchmark"
-
     # 检查依赖
     print_info "检查系统依赖..."
     check_dependencies
@@ -275,7 +273,7 @@ main() {
     local local_ip
     local_ip=$(get_local_ip)
     print_info "本机IP: $local_ip"
-    
+
     # 下载文件
     # print_info "下载程序文件和配置文件..."
     # download_file "$PROGRAM_URL" "$LOCAL_PROGRAM" || exit 1
@@ -289,8 +287,7 @@ main() {
     # 设置网络模式
     NETWORK_MODE="lan"  # 或 "wan"
 
-    chmod +x "$NETWORK_SCRIPT"
-    "$NETWORK_SCRIPT" 5
+    # "$NETWORK_SCRIPT" 5
     
     # echo "📡 配置网络为 $NETWORK_MODE 模式..."
     # if ! configure_network_auto "$NETWORK_MODE"; then
@@ -314,7 +311,7 @@ main() {
     # 运行基准测试
     run_benchmark "$party_id" "$LOCAL_CONFIG" "$NETWORK_MODE"
 
-    sudo "$NETWORK_SCRIPT" 5
+    "$NETWORK_SCRIPT" 5
 
     if ! command -v aws &> /dev/null; then
         sudo apt install awscli
