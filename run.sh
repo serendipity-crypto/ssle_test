@@ -6,7 +6,7 @@
 set -e  # 遇到错误立即退出
 
 # 配置变量
-LOCAL_PROGRAM="share_benchmark"                      # 本地程序文件名
+LOCAL_PROGRAM="/home/ubuntu/ssle_test/share_benchmark"                      # 本地程序文件名
 LOCAL_CONFIG="config.txt"                                 # 本地配置文件名
 
 # 网络配置脚本路径
@@ -225,7 +225,7 @@ run_benchmark() {
 
     # 运行程序
     # echo "执行命令: ./\"$LOCAL_PROGRAM\" \"$party_id\" \"$config_file\" \"$network_mode\""
-    ./"$LOCAL_PROGRAM" $party_id "$config_file" "$network_mode"
+    "$LOCAL_PROGRAM" $party_id "$config_file" "$network_mode"
 }
 
 upload_files() {
