@@ -6,8 +6,8 @@
 set -e  # 遇到错误立即退出
 
 # 配置变量
-PROGRAM_URL="https://your-server.com/benchmark_two_rounds"  # 程序文件下载URL
-CONFIG_URL="https://your-server.com/config.txt"           # 配置文件下载URL
+# PROGRAM_URL="https://your-server.com/benchmark_two_rounds"  # 程序文件下载URL
+CONFIG_URL="https://1drv.ms/t/c/678ec11a457fe55d/EYkt9hS-CItNl96HuWAGLsQBqnKxhJqrTawwKKCiksV24A?e=EMVlU8"           # 配置文件下载URL
 LOCAL_PROGRAM="benchmark_two_rounds"                      # 本地程序文件名
 LOCAL_CONFIG="config.txt"                                 # 本地配置文件名
 
@@ -250,7 +250,7 @@ main() {
     
     # 下载文件
     print_info "下载程序文件和配置文件..."
-    download_file "$PROGRAM_URL" "$LOCAL_PROGRAM" || exit 1
+    # download_file "$PROGRAM_URL" "$LOCAL_PROGRAM" || exit 1
     download_file "$CONFIG_URL" "$LOCAL_CONFIG" || exit 1
 
     # 检查网络配置脚本
@@ -293,11 +293,11 @@ show_usage() {
     echo "功能: 自动下载并运行EMP Share Benchmark"
     echo ""
     echo "环境变量配置:"
-    echo "  PROGRAM_URL: 程序文件下载URL (当前: ${PROGRAM_URL})"
+    # echo "  PROGRAM_URL: 程序文件下载URL (当前: ${PROGRAM_URL})"
     echo "  CONFIG_URL:  配置文件下载URL (当前: ${CONFIG_URL})"
     echo ""
     echo "示例:"
-    echo "  PROGRAM_URL=\"http://192.168.1.100/benchmark_two_rounds\" \\"
+    # echo "  PROGRAM_URL=\"http://192.168.1.100/benchmark_two_rounds\" \\"
     echo "  CONFIG_URL=\"http://192.168.1.100/config.txt\" ./deploy_and_run.sh"
 }
 
@@ -309,9 +309,9 @@ case "${1:-}" in
         ;;
     *)
         # 检查是否通过环境变量设置了URL
-        if [ -n "${PROGRAM_URL_OVERRIDE:-}" ]; then
-            PROGRAM_URL="$PROGRAM_URL_OVERRIDE"
-        fi
+        # if [ -n "${PROGRAM_URL_OVERRIDE:-}" ]; then
+        #     PROGRAM_URL="$PROGRAM_URL_OVERRIDE"
+        # fi
         if [ -n "${CONFIG_URL_OVERRIDE:-}" ]; then
             CONFIG_URL="$CONFIG_URL_OVERRIDE"
         fi
