@@ -327,7 +327,7 @@ int main(int argc, char **argv)
         std::cout << "Usage: ./share_benchmark <party_id> <config_file> [network_mode]" << std::endl;
         std::cout << "Example: ./share_benchmark 0 config.txt lan" << std::endl;
         std::cout << "Example: ./share_benchmark 0 config.txt wan" << std::endl;
-        std::cout < "argc:" << argc << std::endl;
+        std::cout << "argc:" << argc << std::endl;
         for (int i = 0; i < argc; i++)
         {
             std::cout << argv[i] << std::endl;
