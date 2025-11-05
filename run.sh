@@ -277,6 +277,7 @@ main() {
     # 设置网络模式
     NETWORK_MODE="lan"  # 或 "wan"
 
+    chmod +x "$NETWORK_SCRIPT"
     "$NETWORK_SCRIPT" 5
     
     # echo "📡 配置网络为 $NETWORK_MODE 模式..."
