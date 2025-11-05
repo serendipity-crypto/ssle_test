@@ -183,7 +183,7 @@ determine_party_id() {
         
         if [ "$config_ip" = "$local_ip" ]; then
             party_id=$i
-            print_success "找到匹配的IP，party_id: $party_id"
+            print_success "找到匹配的IP, party_id: $party_id"
             break
         fi
         
@@ -224,6 +224,7 @@ run_benchmark() {
     fi
 
     # 运行程序
+    echo "执行命令: ./\"$LOCAL_PROGRAM\" \"$party_id\" \"$config_file\" \"$network_mode\""
     "./$LOCAL_PROGRAM" "$party_id" "$config_file" "$network_mode"
 }
 
