@@ -327,6 +327,7 @@ int main(int argc, char **argv)
         std::cout << "Usage: ./benchmark_two_rounds <party_id> <config_file> [network_mode]" << std::endl;
         std::cout << "Example: ./benchmark_two_rounds 0 config.txt lan" << std::endl;
         std::cout << "Example: ./benchmark_two_rounds 0 config.txt wan" << std::endl;
+        std::cout << argc << std::endl;
         return 1;
     }
 

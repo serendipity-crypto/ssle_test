@@ -211,20 +211,20 @@ run_benchmark() {
     local party_id="$1"
     local config_file="$2"
     local network_mode="$3"
-    
+
     print_info "启动基准测试..."
     print_info "Party ID: $party_id"
     print_info "Network Mode: $network_mode"
     print_info "配置文件: $config_file"
-    
+
     # 检查程序文件是否存在且可执行
     if [ ! -x "$LOCAL_PROGRAM" ]; then
         print_error "程序文件不存在或不可执行: $LOCAL_PROGRAM"
         return 1
     fi
-    
+
     # 运行程序
-    ./$LOCAL_PROGRAM $party_id $config_file $network_mode
+    ./"$LOCAL_PROGRAM" "$party_id" "$config_file" "$network_mode"
 }
 
 # 主函数
