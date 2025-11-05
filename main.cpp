@@ -322,7 +322,7 @@ bool read_config(const std::string &filename, int &num_parties,
 
 int main(int argc, char **argv)
 {
-    if (argc != 3)
+    if (argc != 4)
     {
         std::cout << "Usage: ./share_benchmark <party_id> <config_file> [network_mode]" << std::endl;
         std::cout << "Example: ./share_benchmark 0 config.txt lan" << std::endl;
