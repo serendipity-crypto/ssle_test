@@ -226,7 +226,7 @@ run_benchmark() {
     party_id_clean=$(echo "$party_id" | tr -d '[:space:]' | tr -d '\000-\037')
 
     if ! [[ "$party_id_clean" =~ ^[0-9]+$ ]]; then
-        echo "错误：party_id 必须为纯数字，当前值为: '$party_id'"
+        echo "错误:party_id 必须为纯数字，当前值为: '$party_id'"
         exit 1
     fi
 
