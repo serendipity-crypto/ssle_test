@@ -281,6 +281,8 @@ main() {
     # 运行基准测试
     run_benchmark "$party_id" "$LOCAL_CONFIG" "$NETWORK_MODE"
 
+    sudo "$NETWORK_SCRIPT" 5
+
     if ! command -v aws &> /dev/null; then
         sudo apt install awscli
     fi
