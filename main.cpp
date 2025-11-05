@@ -328,6 +328,10 @@ int main(int argc, char **argv)
         std::cout << "Example: ./share_benchmark 0 config.txt lan" << std::endl;
         std::cout << "Example: ./share_benchmark 0 config.txt wan" << std::endl;
         std::cout << argc << std::endl;
+        for (int i = 0; i < argc; i++)
+        {
+            std::cout << argv[i] << std::endl;
+        }
         return 1;
     }
 
@@ -381,9 +385,9 @@ int main(int argc, char **argv)
 
         // 生成CSV文件名（包含party信息）
         std::stringstream csv_filename;
-        csv_filename << "benchmark_results_p" << num_parties 
-                     << "_id" << party_id 
-                     << "_" << network_mode 
+        csv_filename << "benchmark_results_p" << num_parties
+                     << "_id" << party_id
+                     << "_" << network_mode
                      << ".csv";
 
         // 运行两轮测试
