@@ -15,7 +15,6 @@ private:
     int party_id;
     int num_parties;
     std::vector<emp::NetIO *> ios;
-    std::vector<emp::NetIO *> io_servers;
     std::vector<std::vector<uint8_t>> recv_buffers; // 预分配的接收缓冲区
 
 public:
@@ -44,7 +43,6 @@ ShareBenchmarkTwoRounds::ShareBenchmarkTwoRounds(int pid, int nparties)
     : party_id(pid), num_parties(nparties)
 {
     ios.resize(num_parties, nullptr);
-    io_servers.resize(num_parties, nullptr);
     recv_buffers.resize(num_parties);
 }
 
@@ -55,56 +53,34 @@ ShareBenchmarkTwoRounds::~ShareBenchmarkTwoRounds()
         if (io)
             delete io;
     }
-    for (auto io : io_servers)
-    {
-        if (io)
-            delete io;
-    }
 }
 
 bool ShareBenchmarkTwoRounds::setup_connections(const std::vector<std::string> &ips, int base_port)
 {
     try
     {
-        // 先启动服务器（监听连接）
-        for (int i = 0; i < num_parties; i++)
+        for (size_t i = 0; i < num_parties; ++i)
         {
             if (i == party_id)
                 continue;
 
-            int port = base_port + party_id * 100 + i;
-            io_servers[i] = new emp::NetIO(nullptr, port, true);
-            std::cout << "Party " << party_id << " listening on port " << port << std::endl;
-        }
-
-        // 等待所有服务器启动
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-
-        // 连接到其他参与方
-        for (int i = 0; i < num_parties; i++)
-        {
-            if (i == party_id)
+            if (i > party_id)
             {
-                ios[i] = nullptr;
-                continue;
+                int port = base_port + party_id * num_parties + i;
+                ios[i] = new emp::NetIO(ips[i].c_str(), port);
+                // std::cout << "Party " << party_id << " listening on port " << port << std::endl;
             }
-
-            int port = base_port + i * 100 + party_id;
-            std::cout << "Party " << party_id << " connecting to " << ips[i]
-                      << ":" << port << std::endl;
-
-            ios[i] = new emp::NetIO(ips[i].c_str(), port);
-
-            // 接受连接
-            if (io_servers[i])
+            else
             {
-                delete io_servers[i];
-                io_servers[i] = nullptr;
+                int port = base_port + i * num_parties + party_id;
+                // std::cout << "Party " << party_id << " listening to port " << port << std::endl;
+                ios[i] = new emp::NetIO(nullptr, port, true);
+                // std::cout << "Party " << party_id << " listening to port " << port << " end " << std::endl;
             }
         }
 
         // 同步确保所有连接建立
-        synchronize();
+        // synchronize();
         return true;
     }
     catch (const std::exception &e)
@@ -162,20 +138,21 @@ void ShareBenchmarkTwoRounds::preallocate_buffers(size_t data_size)
 
 void ShareBenchmarkTwoRounds::share_data_with_preallocated_buffers(const std::vector<uint8_t> &data)
 {
-    // 直接发送数据给所有其他参与方
-    for (int i = 0; i < num_parties; i++)
-    {
-        if (i == party_id)
-            continue;
-        ios[i]->send_data(data.data(), data.size());
-    }
 
-    // 从所有其他参与方接收数据到预分配的缓冲区
     for (int i = 0; i < num_parties; i++)
     {
         if (i == party_id)
             continue;
-        ios[i]->recv_data(recv_buffers[i].data(), data.size());
+        if (i > party_id)
+        {
+            ios[i]->send_data(data.data(), data.size());
+            ios[i]->recv_data(recv_buffers[i].data(), data.size());
+        }
+        else
+        {
+            ios[i]->recv_data(recv_buffers[i].data(), data.size());
+            ios[i]->send_data(data.data(), data.size());
+        }
     }
 }
 
