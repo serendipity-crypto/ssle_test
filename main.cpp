@@ -8,14 +8,19 @@
 #include <random>
 #include <iomanip>
 #include <sstream>
+#include <cassert>
+
+const size_t round_count = 3;
 
 class ShareBenchmarkTwoRounds
 {
 private:
     int party_id;
     int num_parties;
+    int log_n;
     std::vector<emp::NetIO *> ios;
-    std::vector<std::vector<uint8_t>> recv_buffers; // 预分配的接收缓冲区
+    std::vector<uint8_t> recv_buffers; // 预分配的接收缓冲区
+    std::mt19937 rng_engine;
 
 public:
     ShareBenchmarkTwoRounds(int party_id, int num_parties);
@@ -30,20 +35,48 @@ public:
 
 private:
     double benchmark_round(size_t data_size, int iterations = 5);
-    void share_data(const std::vector<uint8_t> &data);
-    void share_data_with_preallocated_buffers(const std::vector<uint8_t> &data);
-    std::vector<uint8_t> generate_random_data(size_t size);
-    void synchronize();
+    void share_data(size_t size);
+    void generate_random_data(size_t size);
     void write_to_csv(const std::vector<std::pair<size_t, double>> &results,
                       const std::string &filename);
     void preallocate_buffers(size_t data_size);
+
+    bool is_power_of_two(int n) const { return (n & (n - 1)) == 0; }
+    void validate_data_size(size_t data_size) const;
 };
 
 ShareBenchmarkTwoRounds::ShareBenchmarkTwoRounds(int pid, int nparties)
-    : party_id(pid), num_parties(nparties)
+    : party_id(pid), num_parties(nparties), rng_engine(std::random_device{}())
 {
-    ios.resize(num_parties, nullptr);
-    recv_buffers.resize(num_parties);
+    if (!is_power_of_two(num_parties))
+    {
+        throw std::invalid_argument("Number of parties must be a power of two");
+    }
+
+    log_n = 0;
+    int temp = num_parties;
+    while (temp > 1)
+    {
+        temp >>= 1;
+        log_n++;
+    }
+
+    std::cout << "log_n " << log_n << std::endl;
+    ios.resize(log_n, nullptr);
+}
+
+void ShareBenchmarkTwoRounds::validate_data_size(size_t data_size) const
+{
+    if (data_size == 0)
+    {
+        throw std::invalid_argument("Data size cannot be zero");
+    }
+
+    // 检查缓冲区大小不会溢出
+    if (num_parties > SIZE_MAX / data_size)
+    {
+        throw std::overflow_error("Buffer size would overflow");
+    }
 }
 
 ShareBenchmarkTwoRounds::~ShareBenchmarkTwoRounds()
@@ -59,28 +92,26 @@ bool ShareBenchmarkTwoRounds::setup_connections(const std::vector<std::string> &
 {
     try
     {
-        for (size_t i = 0; i < num_parties; ++i)
+        int mask = 1;
+        for (size_t i = 0; i < log_n; ++i)
         {
-            if (i == party_id)
-                continue;
+            int peer_id = party_id ^ mask;
 
-            if (i > party_id)
+            if (peer_id < party_id)
             {
-                int port = base_port + party_id * num_parties + i;
-                ios[i] = new emp::NetIO(ips[i].c_str(), port);
-                // std::cout << "Party " << party_id << " listening on port " << port << std::endl;
+                int port = base_port + party_id * num_parties + peer_id;
+                std::cout << "Party " << party_id << " connecting to Party " << peer_id << " from port " << port << std::endl;
+                ios[i] = new emp::NetIO(ips[peer_id].c_str(), port);
             }
             else
             {
-                int port = base_port + i * num_parties + party_id;
-                // std::cout << "Party " << party_id << " listening to port " << port << std::endl;
-                ios[i] = new emp::NetIO(nullptr, port, true);
-                // std::cout << "Party " << party_id << " listening to port " << port << " end " << std::endl;
+                int port = base_port + peer_id * num_parties + party_id;
+                std::cout << "Party " << party_id << " listening on port " << port << " for Party " << peer_id << std::endl;
+                ios[i] = new emp::NetIO(nullptr, port);
             }
+            mask <<= 1;
         }
 
-        // 同步确保所有连接建立
-        // synchronize();
         return true;
     }
     catch (const std::exception &e)
@@ -90,87 +121,72 @@ bool ShareBenchmarkTwoRounds::setup_connections(const std::vector<std::string> &
     }
 }
 
-void ShareBenchmarkTwoRounds::synchronize()
+void ShareBenchmarkTwoRounds::generate_random_data(size_t size)
 {
-    // 简单的同步协议
-    for (int i = 0; i < num_parties; i++)
-    {
-        if (i == party_id)
-            continue;
-
-        char sync_msg = 'S';
-        ios[i]->send_data(&sync_msg, 1);
-
-        char ack;
-        ios[i]->recv_data(&ack, 1);
-
-        if (ack != 'A')
-        {
-            throw std::runtime_error("Synchronization failed");
-        }
-    }
-}
-
-std::vector<uint8_t> ShareBenchmarkTwoRounds::generate_random_data(size_t size)
-{
-    std::vector<uint8_t> data(size);
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, 255);
+    std::uniform_int_distribution<uint8_t> dis(0, 255);
+    size_t start_offset = party_id * size;
 
     for (size_t i = 0; i < size; i++)
     {
-        data[i] = static_cast<uint8_t>(dis(gen));
+        recv_buffers[start_offset + i] = dis(rng_engine);
     }
-    return data;
 }
 
 void ShareBenchmarkTwoRounds::preallocate_buffers(size_t data_size)
 {
-    // 为每个连接预分配接收缓冲区
-    for (int i = 0; i < num_parties; i++)
-    {
-        if (i == party_id)
-            continue;
-        recv_buffers[i].resize(data_size);
-    }
+    validate_data_size(data_size);
+
+    recv_buffers.resize(num_parties * data_size);
 }
 
-void ShareBenchmarkTwoRounds::share_data_with_preallocated_buffers(const std::vector<uint8_t> &data)
+void ShareBenchmarkTwoRounds::share_data(size_t data_size)
 {
+    int mask = 1;
+    size_t current_offset = party_id * data_size;
+    size_t current_size = data_size;
 
-    for (int i = 0; i < num_parties; i++)
+    for (int i = 0; i < log_n; i++)
     {
-        if (i == party_id)
-            continue;
-        if (i > party_id)
+        int peer_id = party_id ^ mask;
+
+        if (party_id < peer_id)
         {
-            ios[i]->send_data(data.data(), data.size());
-            ios[i]->recv_data(recv_buffers[i].data(), data.size());
+            // std::cout << "Party " << party_id << " send to Party " << peer_id << std::endl;
+            ios[i]->send_data(recv_buffers.data() + current_offset, current_size);
+            ios[i]->flush();
+            // std::cout << "Party " << party_id << " recv from Party " << peer_id << std::endl;
+            ios[i]->recv_data(recv_buffers.data() + current_offset + current_size, current_size);
         }
         else
         {
-            ios[i]->recv_data(recv_buffers[i].data(), data.size());
-            ios[i]->send_data(data.data(), data.size());
+            // std::cout << "Party " << party_id << " recv from Party " << peer_id << std::endl;
+            ios[i]->recv_data(recv_buffers.data() + current_offset - current_size, current_size);
+            // std::cout << "Party " << party_id << " send to Party " << peer_id << std::endl;
+            ios[i]->send_data(recv_buffers.data() + current_offset, current_size);
+            ios[i]->flush();
+            current_offset -= current_size;
         }
+
+        mask <<= 1;
+        current_size *= 2;
     }
 }
 
 double ShareBenchmarkTwoRounds::benchmark_round(size_t data_size, int iterations)
 {
-    auto data = generate_random_data(data_size);
-
     // 预分配缓冲区
     preallocate_buffers(data_size);
 
+    generate_random_data(data_size);
+
     // 预热
-    share_data_with_preallocated_buffers(generate_random_data(data_size));
+    share_data(data_size);
 
     auto start = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < iterations; i++)
     {
-        share_data_with_preallocated_buffers(data);
+        share_data(data_size);
     }
 
     auto end = std::chrono::high_resolution_clock::now();
@@ -210,11 +226,6 @@ void ShareBenchmarkTwoRounds::write_to_csv(const std::vector<std::pair<size_t, d
 void ShareBenchmarkTwoRounds::run_two_rounds_test(const std::vector<size_t> &data_sizes,
                                                   const std::string &output_csv)
 {
-    if (data_sizes.size() != 2)
-    {
-        std::cerr << "Error: Exactly 2 data sizes required" << std::endl;
-        return;
-    }
 
     std::vector<std::pair<size_t, double>> results;
 
@@ -225,14 +236,14 @@ void ShareBenchmarkTwoRounds::run_two_rounds_test(const std::vector<size_t> &dat
     // 第一轮测试
     std::cout << "Round 1 - Data Size: " << data_sizes[0] << " bytes ("
               << (data_sizes[0] / 1024) << " KB)" << std::endl;
-    double time1 = benchmark_round(data_sizes[0], 5);
+    double time1 = benchmark_round(data_sizes[0], round_count);
     results.push_back({data_sizes[0], time1});
     std::cout << "Time: " << std::fixed << std::setprecision(3) << time1 << " ms" << std::endl;
 
     // 第二轮测试
     std::cout << "Round 2 - Data Size: " << data_sizes[1] << " bytes ("
               << (data_sizes[1] / 1024) << " KB)" << std::endl;
-    double time2 = benchmark_round(data_sizes[1], 5);
+    double time2 = benchmark_round(data_sizes[1], round_count);
     results.push_back({data_sizes[1], time2});
     std::cout << "Time: " << std::fixed << std::setprecision(3) << time2 << " ms" << std::endl;
 
@@ -304,11 +315,11 @@ int main(int argc, char **argv)
         std::cout << "Usage: ./share_benchmark <party_id> <config_file> [network_mode]" << std::endl;
         std::cout << "Example: ./share_benchmark 0 config.txt lan" << std::endl;
         std::cout << "Example: ./share_benchmark 0 config.txt wan" << std::endl;
-        std::cout << "argc:" << argc << std::endl;
-        for (int i = 0; i < argc; i++)
-        {
-            std::cout << argv[i] << std::endl;
-        }
+        // std::cout << "argc:" << argc << std::endl;
+        // for (int i = 0; i < argc; i++)
+        // {
+        //     std::cout << argv[i] << std::endl;
+        // }
         return 1;
     }
 

@@ -38,7 +38,7 @@ show_tc() {
 # 菜单
 echo "请选择要应用的网络限制选项："
 echo "1. 延迟 1ms, 带宽 1Gbit/s"
-echo "2. 延迟 100ms, 带宽 100Mbit/s"
+echo "2. 延迟 30ms, 带宽 1Gbit/s"
 echo "3. 延迟 0.1ms, 带宽 10Gbit/s"
 echo "4. 延迟 0.1ms, 带宽 1Gbit/s"
 echo "5. 重置配置"
@@ -47,7 +47,7 @@ read -p "输入你的选择 (1-6): " choice
 
 case "$choice" in
     1) set_tc "1ms" "1gbit" ;;
-    2) set_tc "100ms" "100mbit" ;;
+    2) set_tc "30ms" "1gbit" ;;
     3) set_tc "0.1ms" "10gbit" ;;
     4) set_tc "0.1ms" "1gbit" ;;
     5) reset_tc ;;
