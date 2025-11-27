@@ -6,7 +6,7 @@ from collections import defaultdict
 
 def analyze_benchmark_results():
     # 查找所有符合条件的文件
-    file_pattern = "benchmark_results_p*_id*_wan.csv"
+    file_pattern = "p*_id*.csv"
     files = glob.glob(file_pattern)
 
     if not files:

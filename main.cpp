@@ -10,7 +10,7 @@
 #include <sstream>
 #include <cassert>
 
-const size_t round_count = 3;
+const size_t round_count = 10;
 
 class ShareBenchmarkTwoRounds
 {
@@ -22,6 +22,17 @@ private:
     std::vector<uint8_t> recv_buffers; // 预分配的接收缓冲区
     std::mt19937 rng_engine;
 
+    // 详细时间记录结构
+    struct TimeRecord
+    {
+        double connection_time_ms;                                // 建立连接的时间
+        std::vector<std::vector<double>> round_times;             // [轮数][迭代次数] 每轮总时间
+        std::vector<std::vector<std::vector<double>>> send_times; // [轮数][迭代次数][对等方] 发送时间
+        std::vector<std::vector<std::vector<double>>> recv_times; // [轮数][迭代次数][对等方] 接收时间
+    };
+
+    TimeRecord detailed_times;
+
 public:
     ShareBenchmarkTwoRounds(int party_id, int num_parties);
     ~ShareBenchmarkTwoRounds();
@@ -31,14 +42,16 @@ public:
 
     // 两轮测试函数
     void run_two_rounds_test(const std::vector<size_t> &data_sizes,
-                             const std::string &output_csv = "benchmark_results.csv");
+                             const std::string &output_csv_1 = "benchmark_results.csv", const std::string &output_csv_2 = "connection_results.csv");
 
 private:
-    double benchmark_round(size_t data_size, int iterations = 5);
-    void share_data(size_t size);
+    void benchmark_round(size_t data_size, int round_index, int iterations = 5);
+    void share_data(size_t size, std::vector<double> &send_times, std::vector<double> &recv_times);
     void generate_random_data(size_t size);
-    void write_to_csv(const std::vector<std::pair<size_t, double>> &results,
-                      const std::string &filename);
+    void write_connection_to_csv(const std::vector<std::pair<size_t, double>> &results,
+                                 const std::string &filename);
+    void write_detailed_times_to_csv(const std::vector<size_t> &data_sizes,
+                                     const std::string &filename);
     void preallocate_buffers(size_t data_size);
 
     bool is_power_of_two(int n) const { return (n & (n - 1)) == 0; }
@@ -63,6 +76,11 @@ ShareBenchmarkTwoRounds::ShareBenchmarkTwoRounds(int pid, int nparties)
 
     std::cout << "log_n " << log_n << std::endl;
     ios.resize(log_n, nullptr);
+
+    // 初始化详细时间记录
+    detailed_times.round_times.resize(2); // 两轮测试
+    detailed_times.send_times.resize(2);
+    detailed_times.recv_times.resize(2);
 }
 
 void ShareBenchmarkTwoRounds::validate_data_size(size_t data_size) const
@@ -90,6 +108,8 @@ ShareBenchmarkTwoRounds::~ShareBenchmarkTwoRounds()
 
 bool ShareBenchmarkTwoRounds::setup_connections(const std::vector<std::string> &ips, int base_port)
 {
+    auto connection_start = std::chrono::high_resolution_clock::now();
+
     try
     {
         int mask = 1;
@@ -111,6 +131,12 @@ bool ShareBenchmarkTwoRounds::setup_connections(const std::vector<std::string> &
             }
             mask <<= 1;
         }
+
+        auto connection_end = std::chrono::high_resolution_clock::now();
+        auto connection_duration = std::chrono::duration_cast<std::chrono::microseconds>(connection_end - connection_start);
+        detailed_times.connection_time_ms = connection_duration.count() / 1000.0;
+
+        std::cout << "Connection setup time: " << detailed_times.connection_time_ms << " ms" << std::endl;
 
         return true;
     }
@@ -139,11 +165,15 @@ void ShareBenchmarkTwoRounds::preallocate_buffers(size_t data_size)
     recv_buffers.resize(num_parties * data_size);
 }
 
-void ShareBenchmarkTwoRounds::share_data(size_t data_size)
+void ShareBenchmarkTwoRounds::share_data(size_t data_size,
+                                         std::vector<double> &send_times, std::vector<double> &recv_times)
 {
     int mask = 1;
     size_t current_offset = party_id * data_size;
     size_t current_size = data_size;
+
+    std::chrono::microseconds send_duration;
+    std::chrono::microseconds recv_duration;
 
     for (int i = 0; i < log_n; i++)
     {
@@ -151,28 +181,43 @@ void ShareBenchmarkTwoRounds::share_data(size_t data_size)
 
         if (party_id < peer_id)
         {
-            // std::cout << "Party " << party_id << " send to Party " << peer_id << std::endl;
+            auto send_start = std::chrono::high_resolution_clock::now();
             ios[i]->send_data(recv_buffers.data() + current_offset, current_size);
             ios[i]->flush();
-            // std::cout << "Party " << party_id << " recv from Party " << peer_id << std::endl;
+            auto send_end = std::chrono::high_resolution_clock::now();
+
+            auto recv_start = send_end;
             ios[i]->recv_data(recv_buffers.data() + current_offset + current_size, current_size);
+            auto recv_end = std::chrono::high_resolution_clock::now();
+
+            send_duration = std::chrono::duration_cast<std::chrono::microseconds>(send_end - send_start);
+            recv_duration = std::chrono::duration_cast<std::chrono::microseconds>(recv_end - recv_start);
         }
         else
         {
-            // std::cout << "Party " << party_id << " recv from Party " << peer_id << std::endl;
+            auto recv_start = std::chrono::high_resolution_clock::now();
             ios[i]->recv_data(recv_buffers.data() + current_offset - current_size, current_size);
-            // std::cout << "Party " << party_id << " send to Party " << peer_id << std::endl;
+            auto recv_end = std::chrono::high_resolution_clock::now();
+
+            auto send_start = recv_end;
             ios[i]->send_data(recv_buffers.data() + current_offset, current_size);
             ios[i]->flush();
+            auto send_end = std::chrono::high_resolution_clock::now();
             current_offset -= current_size;
+
+            send_duration = std::chrono::duration_cast<std::chrono::microseconds>(send_end - send_start);
+            recv_duration = std::chrono::duration_cast<std::chrono::microseconds>(recv_end - recv_start);
         }
+
+        send_times[i] = send_duration.count() / 1000.0;
+        recv_times[i] = recv_duration.count() / 1000.0;
 
         mask <<= 1;
         current_size *= 2;
     }
 }
 
-double ShareBenchmarkTwoRounds::benchmark_round(size_t data_size, int iterations)
+void ShareBenchmarkTwoRounds::benchmark_round(size_t data_size, int round_index, int iterations)
 {
     // 预分配缓冲区
     preallocate_buffers(data_size);
@@ -180,23 +225,34 @@ double ShareBenchmarkTwoRounds::benchmark_round(size_t data_size, int iterations
     generate_random_data(data_size);
 
     // 预热
-    share_data(data_size);
+    std::vector<double> warmup_send_times(log_n, 0.0);
+    std::vector<double> warmup_recv_times(log_n, 0.0);
+    share_data(data_size, warmup_send_times, warmup_recv_times);
 
-    auto start = std::chrono::high_resolution_clock::now();
+    // 为当前轮次初始化时间记录
+    detailed_times.round_times[round_index].resize(iterations);
+    detailed_times.send_times[round_index].resize(iterations);
+    detailed_times.recv_times[round_index].resize(iterations);
 
     for (int i = 0; i < iterations; i++)
     {
-        share_data(data_size);
+        auto round_start = std::chrono::high_resolution_clock::now();
+
+        // 初始化当前迭代的时间记录
+        detailed_times.send_times[round_index][i].resize(log_n, 0.0);
+        detailed_times.recv_times[round_index][i].resize(log_n, 0.0);
+
+        share_data(data_size, detailed_times.send_times[round_index][i],
+                   detailed_times.recv_times[round_index][i]);
+
+        auto round_end = std::chrono::high_resolution_clock::now();
+        auto round_duration = std::chrono::duration_cast<std::chrono::microseconds>(round_end - round_start);
+        detailed_times.round_times[round_index][i] = round_duration.count() / 1000.0;
     }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-    return duration.count() / (iterations * 1000.0); // 返回每次操作的毫秒数
 }
 
-void ShareBenchmarkTwoRounds::write_to_csv(const std::vector<std::pair<size_t, double>> &results,
-                                           const std::string &filename)
+void ShareBenchmarkTwoRounds::write_connection_to_csv(const std::vector<std::pair<size_t, double>> &results,
+                                                      const std::string &filename)
 {
     std::ofstream file(filename);
     if (!file.is_open())
@@ -206,27 +262,62 @@ void ShareBenchmarkTwoRounds::write_to_csv(const std::vector<std::pair<size_t, d
     }
 
     // 写入CSV头部
-    file << "Round,DataSize_KB,DataSize_Bytes,Time_ms,PartyID,NumParties" << std::endl;
+    file << "ConnectionTime_ms" << std::endl;
 
-    // 写入数据
-    for (size_t i = 0; i < results.size(); i++)
-    {
-        file << (i + 1) << ","
-             << (results[i].first / 1024) << ","
-             << results[i].first << ","
-             << std::fixed << std::setprecision(3) << results[i].second << ","
-             << party_id << ","
-             << num_parties << std::endl;
-    }
+    file << detailed_times.connection_time_ms << std::endl;
 
     file.close();
     std::cout << "Results written to: " << filename << std::endl;
 }
 
-void ShareBenchmarkTwoRounds::run_two_rounds_test(const std::vector<size_t> &data_sizes,
-                                                  const std::string &output_csv)
+void ShareBenchmarkTwoRounds::write_detailed_times_to_csv(const std::vector<size_t> &data_sizes,
+                                                          const std::string &filename)
 {
+    std::ofstream file(filename);
+    if (!file.is_open())
+    {
+        std::cerr << "Failed to open detailed CSV file: " << filename << std::endl;
+        return;
+    }
 
+    // 写入CSV头部
+    file << "Round,Iteration,DataSize_KB,DataSize_Bytes,TotalTime_ms";
+
+    // 添加每个对等方的发送和接收时间列
+    for (int i = 0; i < log_n; i++)
+    {
+        file << ",SendToPeer" << i << "_ms";
+        file << ",RecvFromPeer" << i << "_ms";
+    }
+    file << ",PartyID,NumParties" << std::endl;
+
+    // 写入每轮的详细时间
+    for (int round = 0; round < 2; round++)
+    {
+        for (size_t iter = 0; iter < detailed_times.round_times[round].size(); iter++)
+        {
+            file << (round + 1) << "," << (iter + 1) << ","
+                 << (data_sizes[round] / 1024) << "," << data_sizes[round] << ","
+                 << std::fixed << std::setprecision(3) << detailed_times.round_times[round][iter];
+
+            // 写入每个对等方的发送和接收时间
+            for (int peer = 0; peer < log_n; peer++)
+            {
+                file << "," << std::fixed << std::setprecision(3) << detailed_times.send_times[round][iter][peer]
+                     << "," << std::fixed << std::setprecision(3) << detailed_times.recv_times[round][iter][peer];
+            }
+
+            file << "," << party_id << "," << num_parties << std::endl;
+        }
+    }
+
+    file.close();
+    std::cout << "Detailed results written to: " << filename << std::endl;
+}
+
+void ShareBenchmarkTwoRounds::run_two_rounds_test(const std::vector<size_t> &data_sizes,
+                                                  const std::string &output_csv_1, const std::string &output_csv_2)
+{
     std::vector<std::pair<size_t, double>> results;
 
     std::cout << "\n=== Two Rounds EMP Share Benchmark ===" << std::endl;
@@ -236,21 +327,40 @@ void ShareBenchmarkTwoRounds::run_two_rounds_test(const std::vector<size_t> &dat
     // 第一轮测试
     std::cout << "Round 1 - Data Size: " << data_sizes[0] << " bytes ("
               << (data_sizes[0] / 1024) << " KB)" << std::endl;
-    double time1 = benchmark_round(data_sizes[0], round_count);
-    results.push_back({data_sizes[0], time1});
-    std::cout << "Time: " << std::fixed << std::setprecision(3) << time1 << " ms" << std::endl;
+    benchmark_round(data_sizes[0], 0, round_count);
+
+    // 计算第一轮的平均时间
+    double avg_time1 = 0.0;
+    for (auto time : detailed_times.round_times[0])
+    {
+        avg_time1 += time;
+    }
+    avg_time1 /= detailed_times.round_times[0].size();
+    results.push_back({data_sizes[0], avg_time1});
+    std::cout << "Average Time: " << std::fixed << std::setprecision(3) << avg_time1 << " ms" << std::endl;
 
     // 第二轮测试
     std::cout << "Round 2 - Data Size: " << data_sizes[1] << " bytes ("
               << (data_sizes[1] / 1024) << " KB)" << std::endl;
-    double time2 = benchmark_round(data_sizes[1], round_count);
-    results.push_back({data_sizes[1], time2});
-    std::cout << "Time: " << std::fixed << std::setprecision(3) << time2 << " ms" << std::endl;
+    benchmark_round(data_sizes[1], 1, round_count);
+
+    // 计算第二轮的平均时间
+    double avg_time2 = 0.0;
+    for (auto time : detailed_times.round_times[1])
+    {
+        avg_time2 += time;
+    }
+    avg_time2 /= detailed_times.round_times[1].size();
+    results.push_back({data_sizes[1], avg_time2});
+    std::cout << "Average Time: " << std::fixed << std::setprecision(3) << avg_time2 << " ms" << std::endl;
 
     std::cout << std::string(50, '=') << std::endl;
 
-    // 写入CSV文件
-    write_to_csv(results, output_csv);
+    // 写入原始CSV文件（保持兼容性）
+    write_connection_to_csv(results, output_csv_2);
+
+    // 写入详细时间CSV文件
+    write_detailed_times_to_csv(data_sizes, output_csv_1);
 }
 
 // 读取配置文件的辅助函数
@@ -315,11 +425,6 @@ int main(int argc, char **argv)
         std::cout << "Usage: ./share_benchmark <party_id> <config_file> [network_mode]" << std::endl;
         std::cout << "Example: ./share_benchmark 0 config.txt lan" << std::endl;
         std::cout << "Example: ./share_benchmark 0 config.txt wan" << std::endl;
-        // std::cout << "argc:" << argc << std::endl;
-        // for (int i = 0; i < argc; i++)
-        // {
-        //     std::cout << argv[i] << std::endl;
-        // }
         return 1;
     }
 
@@ -327,8 +432,7 @@ int main(int argc, char **argv)
     {
         int party_id = std::stoi(argv[1]);
         std::string config_file = argv[2];
-        std::string network_mode = "unknown";
-        network_mode = argv[3];
+        std::string network_mode = argv[3];
         if (network_mode != "lan" && network_mode != "wan")
         {
             std::cerr << "警告: 网络模式应该是 'lan' 或 'wan'，使用默认值: " << network_mode << std::endl;
@@ -372,14 +476,20 @@ int main(int argc, char **argv)
             data_sizes_kb[1] * 1024};
 
         // 生成CSV文件名（包含party信息）
-        std::stringstream csv_filename;
-        csv_filename << "benchmark_results_p" << num_parties
-                     << "_id" << party_id
-                     << "_" << network_mode
-                     << ".csv";
+        std::stringstream csv_filename_1;
+        csv_filename_1 << "benchmark_results_p" << num_parties
+                       << "_id" << party_id
+                       << "_" << network_mode
+                       << ".csv";
+
+        std::stringstream csv_filename_2;
+        csv_filename_2 << "connection_p" << num_parties
+                       << "_id" << party_id
+                       << "_" << network_mode
+                       << ".csv";
 
         // 运行两轮测试
-        benchmark.run_two_rounds_test(data_sizes_bytes, csv_filename.str());
+        benchmark.run_two_rounds_test(data_sizes_bytes, csv_filename_1.str(), csv_filename_2.str());
 
         std::cout << "Two-rounds benchmark completed!" << std::endl;
     }

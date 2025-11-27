@@ -1,0 +1,10 @@
+#!/bin/bash
+
+sudo apt update
+sudo apt install pssh -y
+cd /usr/bin
+sudo ln -s parallel-ssh pssh
+sudo ln -s parallel-scp pscp
+sudo ln -s parallel-rsync prsync
+sudo ln -s parallel-nuke pnuke
+sudo ln -s parallel-slurp pslurp
