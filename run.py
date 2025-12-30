@@ -204,7 +204,7 @@ def delete_all_csv_files():
             print(f"删除文件 {filename} 时出错: {str(e)}")
 
 
-def upload_results(dufs_server, network_mode, transport):
+def upload_results(dufs_server, scheme, transport, topology, network_mode):
     """上传结果文件到dufs服务器"""
     print_info("查找并上传结果文件...")
 
@@ -219,7 +219,7 @@ def upload_results(dufs_server, network_mode, transport):
     fail_count = 0
 
     # 创建基于时间戳的目录
-    upload_dir = f"{transport}_{network_mode}_results"
+    upload_dir = f"{scheme}_{transport}_{topology}_{network_mode}_results"
 
     for file in files:
         remote_path = f"{upload_dir}/{os.path.basename(file)}"
@@ -232,7 +232,14 @@ def upload_results(dufs_server, network_mode, transport):
     return fail_count == 0
 
 
-def run_benchmark(program_path, party_id, config_path, network_mode):
+def run_benchmark(
+    program_path,
+    party_id,
+    config_path,
+    scheme,
+    network_mode,
+    topology,
+):
     """运行基准测试"""
     print_info("运行基准测试...")
     print_info(f"  Program: {program_path}")
@@ -248,17 +255,32 @@ def run_benchmark(program_path, party_id, config_path, network_mode):
         return False
 
     # 构建命令
-    cmd = [
-        program_path,
-        "-i",
-        str(party_id),
-        "-c",
-        config_path,
-        "-s",
-        f"{network_mode}",
-        "-b",
-        f"{base_port}"
-    ]
+    if scheme == "qelect":
+        cmd = [
+            program_path,
+            "-i",
+            str(party_id),
+            "-c",
+            config_path,
+            "-s",
+            f"{topology}_{network_mode}",
+            "-b",
+            f"{base_port}",
+            "--scheme",
+            "qelect",
+        ]
+    else:
+        cmd = [
+            program_path,
+            "-i",
+            str(party_id),
+            "-c",
+            config_path,
+            "-s",
+            f"{topology}_{network_mode}",
+            "-b",
+            f"{base_port}",
+        ]
     print_info(f"执行命令: {' '.join(cmd)}")
 
     try:
@@ -298,10 +320,12 @@ def main():
     dufs_server = os.environ.get("DUFS_SERVER", "http://148.135.88.228:5000")
 
     # 配置路径
+    scheme = os.environ.get("SCHEME", "relect")  # qelect
     transport = os.environ.get("TRANSPORT", "tcp")
-    network_mode = os.environ.get("NETWORK_MODE", "lan")
+    topology = os.environ.get("TOPOLOGY", "tree")  # pairwise
+    network_mode = os.environ.get("NETWORK_MODE", "lan")  # wan
     local_config = os.environ.get("LOCAL_CONFIG", "./config.txt")
-    local_program = os.environ.get("LOCAL_PROGRAM", f"./{transport}_share")
+    local_program = os.environ.get("LOCAL_PROGRAM", f"./{transport}_{topology}")
 
     # # 验证配置文件并获取参与方数量
     # config_valid, num_parties = validate_config(local_config)
@@ -337,7 +361,14 @@ def main():
     delete_all_csv_files()
 
     # 运行基准测试
-    success = run_benchmark(local_program, party_id, local_config, network_mode)
+    success = run_benchmark(
+        local_program,
+        party_id,
+        local_config,
+        scheme,
+        network_mode,
+        topology,
+    )
 
     if network_mode == "wan":
         cmd = ["./network_config.sh"]
@@ -351,7 +382,13 @@ def main():
     # 上传结果文件
     if success:
         print_info("开始上传结果文件...")
-        upload_success = upload_results(dufs_server, network_mode, transport)
+        upload_success = upload_results(
+            dufs_server,
+            scheme,
+            transport,
+            topology,
+            network_mode,
+        )
         if upload_success:
             print_success("所有操作完成")
         else:

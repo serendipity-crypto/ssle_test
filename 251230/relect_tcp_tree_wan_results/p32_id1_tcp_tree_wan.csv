@@ -1,0 +1,3 @@
+Round,DataSize_KB,DataSize_Bytes,Time_ms,PartyID,NumParties
+0,800,819200,2108.504,1,32
+1,200,204800,1024.908,1,32

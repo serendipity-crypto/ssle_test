@@ -18,9 +18,8 @@ N=$1
 
 WORK_DIR="/home/ubuntu/ssle_test"
 export CONFIG_URL="${DUFS_SERVER}/p${N}_config.txt"
-# export PROGRAM_URL="${DUFS_SERVER}/share_benchmark"
-export TCP_PROGRAM_URL="${DUFS_SERVER}/tcp_share"
-export QUIC_PROGRAM_URL="${DUFS_SERVER}/quic_share"
+export TCP_TREE_PROGRAM_URL="${DUFS_SERVER}/tcp_tree"
+export TCP_PAIRWISE_PROGRAM_URL="${DUFS_SERVER}/tcp_pairwise"
 
 mkdir -p "$WORK_DIR"
 cd "$WORK_DIR"
@@ -38,11 +37,11 @@ wget -O config.txt "${CONFIG_URL}"
 # wget -O share_benchmark "${PROGRAM_URL}"
 # chmod +x share_benchmark
 
-wget -O tcp_share "${TCP_PROGRAM_URL}"
-chmod +x tcp_share
+wget -O tcp_tree "${TCP_TREE_PROGRAM_URL}"
+chmod +x tcp_tree
 
-wget -O quic_share "${QUIC_PROGRAM_URL}"
-chmod +x quic_share
+wget -O tcp_pairwise "${TCP_PAIRWISE_PROGRAM_URL}"
+chmod +x tcp_pairwise
 
 wget -O network_config.sh "${DUFS_SERVER}/network_config.sh"
 chmod +x network_config.sh

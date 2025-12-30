@@ -142,7 +142,11 @@ def save_results_to_csv(results, output_file="analysis.csv", workdir="."):
 
 
 if __name__ == "__main__":
-    path = "./251127/quic_wan_results"
+    # path = "./251208/tcp_wan_results"
+    # path = "./251230/relect_tcp_tree_lan_results"
+    # path = "./251230/relect_tcp_pairwise_lan_results"
+    # path = "./251230/qelect_tcp_pairwise_lan_results"
+    path = "./251230/qelect_tcp_tree_lan_results"
     # ⭐ 这里指定工作目录，例如 "data" 或 "./results"
     analysis_results = analyze_benchmark_results(workdir=path)
 

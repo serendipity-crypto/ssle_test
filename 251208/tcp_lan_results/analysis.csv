@@ -1,0 +1,4 @@
+NumParties,Round1_Avg_Time_ms,Round1_Min_Time_ms,Round1_Max_Time_ms,Round1_Record_Count,Round2_Avg_Time_ms,Round2_Min_Time_ms,Round2_Max_Time_ms,Round2_Record_Count
+32,82.39,79.763,85.597,32,21.976,21.215,23.185,32
+64,185.001,181.672,191.578,64,45.111,42.493,47.658,64
+128,506.649,496.026,528.307,128,118.915,112.393,121.518,128
